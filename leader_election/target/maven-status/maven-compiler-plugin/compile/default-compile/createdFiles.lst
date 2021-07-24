@@ -1,9 +1,3 @@
-com\example\v2\LeaderElection2.class
-com\example\WebServer.class
 com\example\Application.class
-com\example\v2\LeaderElection2$NodeMetadata.class
-com\example\cluster\LeaderNotFoundException.class
-com\example\v2\LeaderElection2$Session.class
 com\example\cluster\management\LeaderElection.class
-com\example\v2\Application2.class
-com\example\v2\LeaderElection2$ServiceMetaData.class
+com\example\WebServer.class
