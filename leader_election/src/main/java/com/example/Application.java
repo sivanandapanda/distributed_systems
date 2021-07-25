@@ -1,53 +1,68 @@
 package com.example;
 
 import com.example.cluster.management.LeaderElection;
-import com.orbitz.consul.Consul;
+import com.example.cluster.management.ServiceRegistry;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
 
-import java.net.UnknownHostException;
-import java.time.LocalDateTime;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
-public class Application {
+public class Application implements Watcher {
 
-    public static void main(String[] args) throws UnknownHostException {
-        int serverPort = args.length > 0 ? Integer.parseInt(args[0]) : 8080;
-        var webServer = new WebServer(serverPort);
-        webServer.startServer();
+    private static final String ZOOKEEPER_ADDRESS = "192.168.1.195:2181";
+    private static final int SESSION_TIMEOUT = 3000;
+    private static final int DEFAULT_PORT = 8080;
+    private ZooKeeper zooKeeper;
 
-        Consul client = Consul.builder().withUrl("http://192.168.1.195:8500").build();
+    public static void main(String[] args) throws IOException, InterruptedException, KeeperException {
+        var currentServerPort = args.length == 1 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
 
-        var serviceName = "leaderService";
-        var tag = "leaderTag";
-        var serviceId = UUID.randomUUID().toString();
-        var leaderElection = new LeaderElection(client, serviceName, tag, serviceId, serverPort);
-        leaderElection.registerService();
+        var application = new Application();
+        ZooKeeper zooKeeper = application.connectToZookeeper();
 
-        var sessionId = leaderElection.createSession();
-        leaderElection.renewSessionPeriodic(sessionId);
+        var serviceRegistry = new ServiceRegistry(zooKeeper);
 
-        new Thread(() -> {
-            while (true) {
-                if (leaderElection.isLeader(sessionId)) {
-                    System.out.println(LocalDateTime.now() + " I am leader");
-                } else {
-                    System.out.println(LocalDateTime.now() +  " I am not the leader");
-                }
+        var onElectionAction = new OnElectionAction(serviceRegistry, currentServerPort);
 
-                try {
-                    TimeUnit.SECONDS.sleep(5);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
+        var leaderElection = new LeaderElection(zooKeeper, onElectionAction);
+        leaderElection.volunteerForLeadership();
+        leaderElection.reElectLeader();
 
-        }).start();
-
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            webServer.stopServer();
-            leaderElection.destroy();
-            client.destroy();
-        }));
+        application.run();
+        application.close();
+        System.out.println("Disconnected from ZooKeeper, exiting application");
     }
 
+    public ZooKeeper connectToZookeeper() throws IOException {
+        this.zooKeeper = new ZooKeeper(ZOOKEEPER_ADDRESS, SESSION_TIMEOUT, this);
+        return zooKeeper;
+    }
+
+    public void run() throws InterruptedException {
+        synchronized (zooKeeper) {
+            zooKeeper.wait();
+        }
+    }
+
+    public void close() throws InterruptedException {
+        zooKeeper.close();
+    }
+
+    @Override
+    public void process(WatchedEvent event) {
+        switch (event.getType()) {
+            case None:
+                if(event.getState() == Event.KeeperState.SyncConnected) {
+                    System.out.println("Successfully connected to Zookeeper");
+                } else {
+                    System.out.println("Disconnected Zookeeper event");
+                    synchronized (zooKeeper) {
+                        zooKeeper.notifyAll();
+                    }
+                }
+                break;
+        }
+    }
 }
