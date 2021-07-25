@@ -1,68 +1,60 @@
 package com.example;
 
-import com.example.cluster.management.LeaderElection;
-import com.example.cluster.management.ServiceRegistry;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooKeeper;
+import io.etcd.jetcd.*;
+import io.etcd.jetcd.election.CampaignResponse;
+import io.etcd.jetcd.kv.GetResponse;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-public class Application implements Watcher {
+public class Application {
 
-    private static final String ZOOKEEPER_ADDRESS = "192.168.1.195:2181";
-    private static final int SESSION_TIMEOUT = 3000;
-    private static final int DEFAULT_PORT = 8080;
-    private ZooKeeper zooKeeper;
+    //private static final String ETCD_SERVER_URL = "http://192.168.1.16:2379";
+    private static final long OPERATION_TIMEOUT = 5;
+    private static final String ETCD_SERVER_URL = "http://127.0.0.1:2379";
 
-    public static void main(String[] args) throws IOException, InterruptedException, KeeperException {
-        var currentServerPort = args.length == 1 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
+    public static void main(String[] args) throws ExecutionException, InterruptedException, TimeoutException {
+        // create client
+        Client client = Client.builder().endpoints(ETCD_SERVER_URL).build();
+        KV kvClient = client.getKVClient();
 
-        var application = new Application();
-        ZooKeeper zooKeeper = application.connectToZookeeper();
+        ByteSequence key = ByteSequence.from("test_key".getBytes());
+        ByteSequence value = ByteSequence.from("test_value".getBytes());
 
-        var serviceRegistry = new ServiceRegistry(zooKeeper);
+        // put the key-value
+        kvClient.put(key, value).get();
 
-        var onElectionAction = new OnElectionAction(serviceRegistry, currentServerPort);
+        // get the CompletableFuture
+        CompletableFuture<GetResponse> getFuture = kvClient.get(key);
 
-        var leaderElection = new LeaderElection(zooKeeper, onElectionAction);
-        leaderElection.volunteerForLeadership();
-        leaderElection.reElectLeader();
+        // get the value from CompletableFuture
+        GetResponse response = getFuture.get();
+        System.out.println(response);
 
-        application.run();
-        application.close();
-        System.out.println("Disconnected from ZooKeeper, exiting application");
-    }
+        var electionClient = client.getElectionClient();
+        var leaseClient = client.getLeaseClient();
 
-    public ZooKeeper connectToZookeeper() throws IOException {
-        this.zooKeeper = new ZooKeeper(ZOOKEEPER_ADDRESS, SESSION_TIMEOUT, this);
-        return zooKeeper;
-    }
+        ByteSequence electionName = ByteSequence.from("/leader-election/", StandardCharsets.UTF_8);
 
-    public void run() throws InterruptedException {
-        synchronized (zooKeeper) {
-            zooKeeper.wait();
-        }
-    }
+        // register lease
+        long leaseId = leaseClient.grant(10).get().getID();
+        System.out.println("LeaseID " + leaseId);
+        // start new campaign
+        ByteSequence firstProposal = ByteSequence.from("proposal1", StandardCharsets.UTF_8);
 
-    public void close() throws InterruptedException {
-        zooKeeper.close();
-    }
+        CampaignResponse campaignResponse = electionClient.campaign(electionName, leaseId, firstProposal).get(OPERATION_TIMEOUT, TimeUnit.SECONDS);
 
-    @Override
-    public void process(WatchedEvent event) {
-        switch (event.getType()) {
-            case None:
-                if(event.getState() == Event.KeeperState.SyncConnected) {
-                    System.out.println("Successfully connected to Zookeeper");
-                } else {
-                    System.out.println("Disconnected Zookeeper event");
-                    synchronized (zooKeeper) {
-                        zooKeeper.notifyAll();
-                    }
-                }
-                break;
+        System.out.println(campaignResponse.getLeader().getKey());
+        System.out.println(campaignResponse.getLeader().getLease());
+        System.out.println(campaignResponse.getLeader().getName());
+
+        if(electionName.getBytes() == campaignResponse.getLeader().getName().toByteArray()) {
+            System.out.println("I am leader");
+        } else {
+            System.out.println("I am not leader");
         }
     }
 }
