@@ -1,1 +1,5 @@
 scp leader_election/target/leader_election-1.0-SNAPSHOT-jar-with-dependencies.jar pi@192.168.1.195:/home/pi/projects/distributed_systems
+
+curl -N http://localhost:2379/v3/watch   -X POST -d '{"create_request": { "key":"Zm9v"} }'
+
+curl -L http://localhost:2379/v3/kv/put   -X POST -d '{"key": "Zm9v", "value": "YmFy"}'
