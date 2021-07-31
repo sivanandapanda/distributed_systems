@@ -18,25 +18,25 @@ public class WatchService {
     public void watch(String key) {
         var watchStub = WatchGrpc.newStub(channel);
 
-        var watchRequest = WatchRequest.newBuilder().setCreateRequest(WatchCreateRequest.newBuilder().setKey(ByteString.copyFromUtf8(key)).build()).build();
-
-        var watch = watchStub.watch(new StreamObserver<WatchResponse>() {
+        var watch = watchStub.watch(new StreamObserver<>() {
             @Override
             public void onNext(WatchResponse watchResponse) {
-
+                System.out.println("onNext " + watchResponse);
             }
 
             @Override
             public void onError(Throwable throwable) {
-
+                throwable.printStackTrace();
             }
 
             @Override
             public void onCompleted() {
-
+                System.out.println("Completed");
             }
         });
 
+        watch.onNext(WatchRequest.newBuilder().setCreateRequest(WatchCreateRequest.newBuilder().setKey(ByteString.copyFromUtf8(key)).build())
+                .build());
     }
 
 }

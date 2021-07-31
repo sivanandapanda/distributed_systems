@@ -15,7 +15,16 @@ class HelloGrpcServerTest {
 
         HelloServiceGrpc.HelloServiceBlockingStub stub = HelloServiceGrpc.newBlockingStub(channel);
 
-        var helloResponse = stub.hello(HelloRequest.newBuilder().setFirstName("John").setLastName("Smith").build());
+        var helloRequest = HelloRequest.newBuilder()
+                .setFirstName("John")
+                .setLastName("Smith")
+                .setAge(12)
+                .addHobbies("games")
+                .addHobbies("learning")
+                .putBagOfTricks("architect", "imposter")
+                .build();
+
+        var helloResponse = stub.hello(helloRequest);
 
         System.out.println(helloResponse.getGreeting());
 

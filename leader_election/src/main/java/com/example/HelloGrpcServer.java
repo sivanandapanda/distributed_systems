@@ -10,11 +10,11 @@ public class HelloGrpcServer extends HelloServiceGrpc.HelloServiceImplBase {
     @Override
     public void hello(HelloRequest request, StreamObserver<HelloResponse> responseObserver) {
 
+        System.out.println(request);
+
         var greeting = "Hello, " + request.getFirstName() + " " + request.getLastName();
 
-        var helloResponse = HelloResponse.newBuilder().setGreeting(greeting).build();
-
-        responseObserver.onNext(helloResponse);
+        responseObserver.onNext(HelloResponse.newBuilder().setGreeting(greeting).build());
         responseObserver.onCompleted();
     }
 }

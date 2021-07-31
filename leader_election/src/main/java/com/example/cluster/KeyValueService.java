@@ -22,11 +22,11 @@ public class KeyValueService {
                 .build();
 
         var putResponse = kvBlockingStub.put(putRequest);
-        System.out.println("Put operation was successful");
+        /*System.out.println("Put operation was successful");
         System.out.println("ClusterId: " + putResponse.getHeader().getClusterId());
         System.out.println("MemberId: " + putResponse.getHeader().getMemberId());
         System.out.println("Revision: " + putResponse.getHeader().getRevision());
-        System.out.println("RaftTerm: " + putResponse.getHeader().getRaftTerm());
+        System.out.println("RaftTerm: " + putResponse.getHeader().getRaftTerm());*/
     }
 
 }

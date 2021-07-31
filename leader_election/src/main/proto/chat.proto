@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.example.proto";
+
+import "google/protobuf/timestamp.proto";
+
+message ChatMessage {
+  string from = 1;
+  string message =2;
+}
+
+message ChatMessageFromServer {
+  google.protobuf.Timestamp timestamp = 1;
+  ChatMessage message = 2;
+}
+
+service ChatService {
+  rpc chat(stream ChatMessage) returns (ChatMessageFromServer);
+}

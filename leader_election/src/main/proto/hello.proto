@@ -2,9 +2,18 @@ syntax = "proto3";
 option java_multiple_files = true;
 option java_package = "com.example.proto";
 
+enum Sentiment {
+  HAPPY = 0;
+  SAD = 1;
+}
+
 message HelloRequest {
   string firstName = 1;
   string lastName = 2;
+  int64 age = 3;
+  Sentiment sentiment = 4;
+  repeated string hobbies = 5;
+  map<string, string> bagOfTricks = 6;
 }
 
 message HelloResponse {
